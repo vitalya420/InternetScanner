@@ -1,5 +1,4 @@
 import sys
-from threading import Thread
 
 from mcstatus import JavaServer
 
@@ -12,22 +11,10 @@ ips = database.IP2Location('IPs.sqlite3')
 ips_rows = ips.country_code(country)
 
 
-def check(ip, port):
-    try:
-        server = JavaServer.lookup(f'{ip}:{port}', timeout=1)
-        with open('good.txt', 'a') as file:
-            file.write(f'{ip}:{port} {server.status().raw}\n')
-    except Exception as exc:
-        print(exc)
-
-
 def on_res(ip, port):
-    try:
-        Thread(target=check, args=(ip, port)).start()
-        with open('out.txt', 'a') as res:
-            res.write(f'{ip}:{port}\n')
-    except Exception as exc:
-        print(exc)
+    print(f'********\n{ip}:{port}\n********')
+    with open('out.txt', 'a') as res:
+        res.write(f'{ip}:{port}\n')
 
 
 rows_amount = len(ips_rows)
@@ -52,7 +39,7 @@ for i in range(threads):
     print(start, end)
     p = MultiProcessedAsyncPortChecker(ip_rows=ips_rows[start:end], ports=[int(port) for port in ports.split(',')],
                                        block=int(block),
-                                       timeout=1.5, callback=on_res)
+                                       timeout=3, callback=on_res)
     proc.append(p)
 
 for p in proc:
