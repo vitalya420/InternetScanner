@@ -39,7 +39,6 @@ class AsyncPortChecker:
         self.callback = callback
 
     async def check_async(self, ip, port, proto='TCP'):
-        return False
         try:
             if proto == 'TCP':
                 fut = self.loop.create_connection(asyncio.Protocol, ip, port)
