@@ -159,3 +159,4 @@ class MultiProcessedAsyncPortChecker(Process):
             self.proceed_ip_block(ips_block)
             total_time = time.perf_counter() - start
             print(f'[PID: {self.pid}][Block check end] Total time: {total_time}')
+        print(f'[PID: {self.pid}] Finished')
