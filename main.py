@@ -53,7 +53,6 @@ for i in range(threads):
     p = MultiProcessedAsyncPortChecker(ip_rows=ips_rows[start:end], ports=[int(port) for port in ports.split(',')],
                                        block=int(block),
                                        timeout=1.5, callback=on_res)
-    p.daemon = True
     proc.append(p)
 
 for p in proc:
