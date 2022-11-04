@@ -154,7 +154,7 @@ class MultiProcessedAsyncPortChecker(Process):
     def run(self):
         for i in range(0, len(self.ip_rows), self.block):
             ips_block = self.ip_rows[i:i + self.block]
-            print(f'[PID: {self.pid}][{((i + self.block) / len(self.ip_rows)) * 100:.2f}}][Starting block check] Amount: {self.calc_ips(ips_block)}')
+            print(f'[PID: {self.pid}][{((i + self.block) / len(self.ip_rows)) * 100:.2f}][Starting block check] Amount: {self.calc_ips(ips_block)}')
             start = time.perf_counter()
             self.proceed_ip_block(ips_block)
             total_time = time.perf_counter() - start
