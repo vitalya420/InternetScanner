@@ -1,5 +1,7 @@
 import sys
 
+from mcstatus import JavaServer
+
 import database
 from scanner.async_scanner import MultiProcessedAsyncPortChecker
 
@@ -10,9 +12,15 @@ ips_rows = ips.country_code(country)
 
 
 def on_res(ip, port):
-    print(ip, port)
-    with open('out.txt', 'a') as res:
-        res.write(f'{ip}:{port}\n')
+    try:
+        server = JavaServer.lookup(f'{ip}:{port}', timeout=1)
+        print(f'{ip}:{port} {server.status().raw}')
+        with open('good.txt', 'a') as file:
+            file.write(f'{ip}:{port} {server.status().raw}\n')
+        with open('out.txt', 'a') as res:
+            res.write(f'{ip}:{port}\n')
+    except Exception:
+        pass
 
 
 rows_amount = len(ips_rows)
