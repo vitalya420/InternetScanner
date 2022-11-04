@@ -17,8 +17,8 @@ def check(ip, port):
         server = JavaServer.lookup(f'{ip}:{port}', timeout=1)
         with open('good.txt', 'a') as file:
             file.write(f'{ip}:{port} {server.status().raw}\n')
-    except:
-        pass
+    except Exception as exc:
+        print(exc)
 
 
 def on_res(ip, port):
@@ -26,8 +26,8 @@ def on_res(ip, port):
         Thread(target=check, args=(ip, port)).start()
         with open('out.txt', 'a') as res:
             res.write(f'{ip}:{port}\n')
-    except Exception:
-        pass
+    except Exception as exc:
+        print(exc)
 
 
 rows_amount = len(ips_rows)
