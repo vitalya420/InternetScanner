@@ -21,9 +21,18 @@ block = int(block)
 
 threads = 4
 
+# p = []
+# for row in ips_rows:
+#     amount = row[2] - row[1]
+#     print(row, amount)
+#     if amount not in p:
+#         p.append(amount)
+# print(sorted(p))
+
+
 proc: list[MultiProcessedAsyncPortChecker] = []
 for i in range(threads):
-    start = i*(rows_amount // threads)
+    start = i * (rows_amount // threads)
     end = start + (rows_amount // threads)
     print(start, end)
     p = MultiProcessedAsyncPortChecker(ip_rows=ips_rows[start:end], ports=[int(port) for port in ports.split(',')],
@@ -33,4 +42,4 @@ for i in range(threads):
 
 for p in proc:
     p.start()
-    #p.join()
+#     #p.join()

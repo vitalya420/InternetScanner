@@ -39,6 +39,7 @@ class AsyncPortChecker:
         self.callback = callback
 
     async def check_async(self, ip, port, proto='TCP'):
+        return False
         try:
             if proto == 'TCP':
                 fut = self.loop.create_connection(asyncio.Protocol, ip, port)
@@ -112,6 +113,7 @@ class MultiProcessedAsyncPortChecker(Process):
         self.block = block
         self.ports = ports
         self.callback = callback
+        self.checker = AsyncPortChecker(event_loop=asyncio.new_event_loop(), timeout=3, callback=self.callback)
 
     @staticmethod
     def calc_ips(ip_range):
@@ -120,23 +122,41 @@ class MultiProcessedAsyncPortChecker(Process):
             total += ip_row[2] - ip_row[1]
         return total
 
+    def split_row(self, row):
+        iters_amount = (row[2] - row[1]) // 25_000
+        additional = (row[2] - row[1]) % 25_000
+        for i in range(iters_amount):
+            pad = i * 25_000
+            yield row[1] + pad, row[1] + pad + 3
+        else:
+            if additional:
+                yield row[1] + pad + 3, row[2]
+
+    def proceed_ip_block(self, block):
+        ips_amount = self.calc_ips(block)
+        if ips_amount <= 25_000:
+            self.checker.check_many(block, self.ports)
+        else:
+            print(f"[PID: {self.pid}] Block has to many IPs. Splitting")
+            for row in block:
+                ips_in_row = row[2] - row[1]
+                if ips_in_row > 25_000:
+                    for i, mini_block in enumerate(self.split_row(row)):
+                        print(f"[PID: {self.pid}] Row splitted to mini blocks. Checking block index: {i}")
+                        start = time.perf_counter()
+                        self.checker.check_range(*mini_block, self.ports)
+                        print(f"[PID: {self.pid}] Mini block check end (index: {i}). "
+                              f"Total time: {time.perf_counter() - start}")
+                else:
+                    print(f"[PID: {self.pid}] Row has {ips_in_row} IPs. Checking all.")
+                    self.checker.check_range(row[1], row[2], self.ports)
+        return True
+
     def run(self):
-        rows_amount = len(self.ip_rows)
-        checker = AsyncPortChecker(event_loop=asyncio.new_event_loop(), timeout=3, callback=self.callback)
         for i in range(0, len(self.ip_rows), self.block):
-            ips_amount_to_be_checked = self.calc_ips(self.ip_rows[i:i + self.block])
-            if ips_amount_to_be_checked < 20_000:
-                start = time.perf_counter()
-                checker.check_many(self.ip_rows[i:i + self.block], self.ports)
-                print(
-                    f"[{self.name}][{i} - {i + self.block}][{ips_amount_to_be_checked}][Progress: {((i + self.block) / rows_amount) * 100:.2f}%]check time: {time.perf_counter() - start}.]")
-            else:
-                for j, s_ip_row in enumerate(self.ip_rows[i:i + self.block]):
-                    start = time.perf_counter()
-                    checker.check_range(s_ip_row[1], s_ip_row[2], self.ports)
-                    print(
-                        f"[{self.name}][{i} - {i + self.block}][Part {j}][Progress: {((i + self.block) / rows_amount) * 100:.2f}%]check time: {time.perf_counter() - start}.]")
-
-
-# checker = MultiProcessedAsyncPortChecker(timeout=1)
-# print(checker.loop.run_until_complete(checker.check_range_async(34953472, 34953727, 25565)))
+            ips_block = self.ip_rows[i:i + self.block]
+            print(f'[PID: {self.pid}][Starting block check] Amount: {self.calc_ips(ips_block)}')
+            start = time.perf_counter()
+            self.proceed_ip_block(ips_block)
+            total_time = time.perf_counter() - start
+            print(f'[PID: {self.pid}][Block check end] Total time: {total_time}')
