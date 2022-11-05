@@ -141,7 +141,7 @@ class MultiProcessedAsyncPortChecker(Process):
                 ips_in_row = row[2] - row[1]
                 if ips_in_row > 25_000:
                     for i, mini_block in enumerate(self.split_row(row)):
-                        print(f"[PID: {self.pid}] Row splitted to mini blocks. Checking block index: {i}")
+                        print(f"[PID: {self.pid}] Row splitted to mini blocks. Checking block index: {i}. {mini_block}")
                         start = time.perf_counter()
                         self.checker.check_range(*mini_block, self.ports)
                         print(f"[PID: {self.pid}] Mini block check end (index: {i}). "
