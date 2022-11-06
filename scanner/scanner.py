@@ -2,96 +2,124 @@ import asyncio
 import socket
 import struct
 import time
+import typing
 from multiprocessing import Queue
 from dataclasses import dataclass
 from multiprocessing import Process
+from threading import Thread
 from time import perf_counter, time
 
 
-@dataclass
-class IPStatus:
-    ip: str
-    port: int
-    opened: bool
-
-
 class Scanner(Process):
-    def __init__(self, ip_rows=None):
+    def __init__(self,
+                 ip_rows: list,
+                 ports: typing.Iterable,
+                 callback: typing.Union[typing.Callable, None] = None,
+                 event_loop: asyncio.AbstractEventLoop = asyncio.new_event_loop(),
+                 block_size: int = 5,
+                 timeout: typing.Union[int, float] = 1.5,
+                 stdout_callback: typing.Union[typing.Callable, None] = None
+                 ):
         super().__init__()
         self.ip_rows = ip_rows
-        self.event_loop = asyncio.new_event_loop()
-        self.q = Queue()
-        self.res_q = Queue()
-        self.is_busy = False
+        self.ports = ports
+        self._callback = callback
+        self.event_loop = event_loop
+        self.block_size = block_size
+        self.timeout = timeout
+        self.stdout_callback = stdout_callback
 
-    def scan_nowait(self, ip_range, port, callback):
-        self.q.put((ip_range, port, callback))
+    def callback(self, *args, **kwargs):
+        if self._callback and callable(self._callback):
+            Thread(target=self.callback, args=(args, kwargs))
+            return True
+        return False
 
-    def scan(self, ip_range, port):
-        self.q.put((ip_range, port, None))
-        return self.res_q.get()
+    def stdout(self, message):
+        if self.stdout_callback and callable(self.stdout_callback):
+            self.stdout_callback(self, message)
 
-    async def await_for_scan(self):
-        while True:
-            item = self.q.get()
-            self.is_busy = True
-            ip_range, port, callback = item
-            tasks = []
-            for ip in range(ip_range[1], ip_range[2]):
-                ip_str = socket.inet_ntoa(struct.pack('!L', ip))
-                if isinstance(port, int):
-                    tasks.append(asyncio.create_task(self.check_port(ip_str, port)))
-                if isinstance(port, list):
-                    for p in port:
-                        tasks.append(asyncio.create_task(self.check_port(ip_str, p)))
-            all_results = await asyncio.gather(*tasks)
-            self.res_q.put(all_results)
-            if callback and callable(callback):
-                callback(self, all_results)
-            self.is_busy = False
+    async def check_port(self, ip, port, call_callback=True, proto="TCP"):
+        try:
+            if proto == 'TCP':
+                fut = self.event_loop.create_connection(asyncio.Protocol, ip, port)
+                await asyncio.wait_for(fut, timeout=self.timeout)
+                if call_callback:
+                    self.callback(ip, port)
+                return True
+            return False
+        except asyncio.exceptions.TimeoutError:
+            return False
+        except OSError:
+            return False
+
+    async def check_range(self, ip_a, ip_b, ports):
+        tasks = []
+        for ip in range(ip_a, ip_b):
+            ip_str = socket.inet_ntoa(struct.pack('!L', ip))
+            if isinstance(ports, list):
+                for port in ports:
+                    tasks.append(self.event_loop.create_task(self.check_port(ip_str, port)))
+            else:
+                tasks.append(self.event_loop.create_task(self.check_port(ip_str, ports)))
+        results = await asyncio.gather(*tasks)
+        return results
+
+    async def check_many(self, ip_rows, port):
+        tasks = []
+        for ip_row in ip_rows:
+            tasks.append(self.event_loop.create_task(self.check_range(ip_row[1], ip_row[2], port)))
+        results = await asyncio.gather(*tasks)
+        return results
+
+    @staticmethod
+    def calc_ips(ip_range):
+        total = 0
+        for ip_row in ip_range:
+            total += ip_row[2] - ip_row[1]
+        return total
+
+    @staticmethod
+    def split_row(row):
+        iters_amount = (row[2] - row[1]) // 25_000
+        additional = (row[2] - row[1]) % 25_000
+        for i in range(iters_amount):
+            pad = i * 25_000
+            yield row[1] + pad, row[1] + pad + 3
+        else:
+            if additional:
+                yield row[1] + pad + 3, row[2]
+
+    async def proceed_ip_block(self, block):
+        ips_amount = self.calc_ips(block)
+        if ips_amount <= 25_000:
+            await self.check_many(block, self.ports)
+        else:
+            self.stdout(f"Block has to many IPs. Splitting")
+            for row in block:
+                ips_in_row = row[2] - row[1]
+                if ips_in_row > 25_000:
+                    for i, mini_block in enumerate(self.split_row(row)):
+                        self.stdout(f"Row splitted to mini blocks. Checking block index: {i}. {mini_block}")
+                        start = time.perf_counter()
+                        await self.check_range(*mini_block, self.ports)
+                        self.stdout(f"Mini block check end (index: {i}). "
+                                    f"Total time: {time.perf_counter() - start}")
+                else:
+                    self.stdout(f"Row has {ips_in_row} IPs. Checking all.")
+                    await self.check_range(row[1], row[2], self.ports)
+        return True
+
+    async def _run(self):
+        for i in range(0, len(self.ip_rows), self.block_size):
+            ips_block = self.ip_rows[i:i + self.block_size]
+            self.stdout(f'[{((i + self.block_size) / len(self.ip_rows)) * 100:.2f}]'
+                        f'[Starting block check] Amount: {self.calc_ips(ips_block)}')
+            start = perf_counter()
+            await self.proceed_ip_block(ips_block)
+            total_time = perf_counter() - start
+            self.stdout(f'[Block check end] Total time: {total_time}')
+        self.stdout('Finished!')
 
     def run(self) -> None:
-        if self.ip_rows:
-            self.event_loop.run_until_complete(self.main())
-        else:
-            self.event_loop.create_task(self.await_for_scan())
-            self.event_loop.run_forever()
-
-    async def check_port(self, ip=None, port=None):
-        try:
-            future = asyncio.open_connection(ip, port)
-            try:
-                await asyncio.wait_for(future, timeout=1)
-            except asyncio.TimeoutError:
-                return IPStatus(ip, port, False)
-            return IPStatus(ip, port, True)
-        except ConnectionRefusedError:
-            return IPStatus(ip, port, False)
-        except OSError:
-            return IPStatus(ip, port, False)
-
-    async def main(self):
-        for ip_range in self.ip_rows:
-            start = perf_counter()
-            tasks = []
-            ips_amount = ip_range[1] - ip_range[2]
-            c = (ip_range[2] - ip_range[1]) // 10
-            x = 10 * c, ip_range[2]
-
-            for i in range(10):
-                for ip in range(i*c, i*c+c):
-                    ip_str = socket.inet_ntoa(struct.pack('!L', ip))
-                    tasks.append(asyncio.create_task(self.check_port(ip_str, 25565)))
-            if x[0] != x[1]:
-                for ip in range(x[0], x[1]):
-                    ip_str = socket.inet_ntoa(struct.pack('!L', ip))
-                    tasks.append(asyncio.create_task(self.check_port(ip_str, 25565)))
-
-            all_results = await asyncio.gather(*tasks)
-            end = perf_counter()
-            for res in all_results:
-                if res.opened:
-                    print(f'{res.ip}:{res.port}')
-                    with open("out.txt", "a") as file:
-                        file.write(f'{res.ip}:{res.port}\n')
-            print(f"Process {self.name} just finished range in {end - start} s.)")
+        self.event_loop.run_until_complete(self._run())

@@ -3,6 +3,8 @@ import socket
 import struct
 import time
 from multiprocessing import Process
+from multiprocessing.process import AuthenticationString
+from threading import Thread
 from typing import Union, Callable
 
 
@@ -105,14 +107,19 @@ class AsyncPortChecker:
         return result
 
 
-class MultiProcessedAsyncPortChecker(Process):
-    def __init__(self, ip_rows, block, ports, callback, *args, **kwargs):
+class MultiProcessedAsyncPortChecker(Thread):
+    def __init__(self, ip_rows, ports, block, timeout, callback, out, *args, **kwargs):
         super().__init__()
         self.ip_rows = ip_rows
         self.block = block
         self.ports = ports
         self.callback = callback
-        self.checker = AsyncPortChecker(event_loop=asyncio.new_event_loop(), timeout=3, callback=self.callback)
+        self.out = out
+        self.checker = AsyncPortChecker(
+            event_loop=asyncio.new_event_loop(),
+            timeout=timeout, callback=self.callback
+        )
+        out(self, 'Inited')
 
     @staticmethod
     def calc_ips(ip_range):
@@ -160,3 +167,14 @@ class MultiProcessedAsyncPortChecker(Process):
             total_time = time.perf_counter() - start
             print(f'[PID: {self.pid}][Block check end] Total time: {total_time}')
         print(f'[PID: {self.pid}] Finished')
+
+    # def __getstate__(self):
+    #     state = self.__dict__.copy()
+    #     conf = state['_config']
+    #     if 'authkey' in conf:
+    #         conf['authkey'] = bytes(conf['authkey'])
+    #     return state
+    #
+    # def __setstate__(self, state):
+    #     state['_config']['authkey'] = AuthenticationString(state['_config']['authkey'])
+    #     self.__dict__.update(state)
