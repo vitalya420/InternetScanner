@@ -99,10 +99,10 @@ class Scanner(Process):
                 if ips_in_row > 25_000:
                     for i, mini_block in enumerate(self.split_row(row)):
                         self.stdout(f"Row splitted to mini blocks. Checking block index: {i}. {mini_block}")
-                        start = time.perf_counter()
+                        start = perf_counter()
                         await self.check_range(*mini_block, self.ports)
                         self.stdout(f"Mini block check end (index: {i}). "
-                                    f"Total time: {time.perf_counter() - start}")
+                                    f"Total time: {perf_counter() - start}")
                 else:
                     self.stdout(f"Row has {ips_in_row} IPs. Checking all.")
                     await self.check_range(row[1], row[2], self.ports)
