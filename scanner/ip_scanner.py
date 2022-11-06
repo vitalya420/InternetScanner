@@ -2,7 +2,7 @@ import asyncio
 from multiprocessing import Process
 
 
-class IPScanner(Process):
+class PortScanner(Process):
     def __init__(self, ip, ports, callback, timeout,
                  event_loop=asyncio.new_event_loop()):
         super().__init__()
@@ -10,7 +10,7 @@ class IPScanner(Process):
         self.ports = ports
         self.callback = callback
         self.event_loop = event_loop
-        self.timeout = 1
+        self.timeout = timeout
 
     async def check_port(self, port, proto='TCP'):
         try:

@@ -3,7 +3,7 @@ import typing
 from multiprocessing import Queue, Process
 
 import database
-from scanner import Scanner
+from scanner import Scanner, PortScanner
 
 
 def parse_ports(ports):
@@ -61,7 +61,16 @@ def main(country: str, ip: str, threads_amount: int, block_size: int,
             thread.start()
             threads.append(thread)
     elif not country and ip:
-        print(list(chunks(ports, len(ports) // threads_amount)))
+        scanners = []
+        for ports in chunks(ports, len(ports) // threads_amount):
+            portscanner = PortScanner(
+                ip=ip,
+                ports=ports,
+                callback=temp_callback,
+                timeout=timeout
+            )
+            portscanner.start()
+            scanners.append(portscanner)
 
     # for thread in threads:
     #     thread.join()
