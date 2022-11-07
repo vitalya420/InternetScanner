@@ -29,7 +29,7 @@ class Scanner(Process):
 
     def callback(self, *args, **kwargs):
         if self._callback and callable(self._callback):
-            Thread(target=self.callback, args=(args, kwargs))
+            Thread(target=self.callback, args=(args, kwargs)).start()
             return True
         return False
 
