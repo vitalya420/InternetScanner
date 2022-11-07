@@ -31,10 +31,13 @@ class Stdout:
         print(f'[{thread.pid}]: {message}')
 
 
-def temp_callback(ip, port):
-    print(f'{ip}:{port}')
-    with open('out.txt', 'a') as res:
-        res.write(f'{ip}:{port}\n')
+def temp_callback(statuses):
+    # print(f'{ip}:{port}')
+    # with open('out.txt', 'a') as res:
+    #     res.write(f'{ip}:{port}\n')
+    for status in statuses:
+        for chunk in status:
+            print(chunk)
 
 
 def chunks(lst, n):

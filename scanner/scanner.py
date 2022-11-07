@@ -78,10 +78,7 @@ class Scanner(Process, PortChecker):
                         f'[Starting block check] Amount: {self.calc_ips(ips_block)}')
             start = perf_counter()
             res = self.proceed_ip_block(ips_block)
-            for chunk in res:
-                for status in chunk:
-                    if status[2]:
-                        self.callback(*status)
+            self.callback(res)
             total_time = perf_counter() - start
             self.stdout(f'[Block check end] Total time: {total_time}')
         self.stdout('Finished!')
