@@ -61,7 +61,7 @@ class Scanner(Process):
         results = await asyncio.gather(*tasks)
         for result in results:
             if isinstance(result, tuple):
-                self.stdout(result)
+                self.callback(result[0], result[1])
         return results
 
     async def check_many(self, ip_rows, port):

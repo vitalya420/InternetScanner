@@ -57,7 +57,7 @@ def main(country: str, ip: str, threads_amount: int, block_size: int,
                              block_size=block_size,
                              timeout=timeout,
                              callback=temp_callback,
-                             stdout_callback= None) #lambda t, m: print(f'[{t.pid}]: {m}'))
+                             stdout_callback=lambda t, m: print(f'[{t.pid}]: {m}'))
             thread.start()
             threads.append(thread)
     elif not country and ip:
