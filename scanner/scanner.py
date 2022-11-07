@@ -37,7 +37,7 @@ class Scanner(Process):
         if self.stdout_callback and callable(self.stdout_callback):
             self.stdout_callback(self, message)
 
-    async def check_port(self, ip, port, call_callback=True, proto="TCP"):
+    async def check_port(self, ip, port, proto="TCP"):
         if proto == 'TCP':
             fut = self.event_loop.create_connection(asyncio.Protocol, ip, port)
             try:
@@ -46,9 +46,7 @@ class Scanner(Process):
                 return False
             except OSError:
                 return False
-            if call_callback:
-                self.callback(ip, port)
-            return True
+            return ip, port, True
         return False
 
     async def check_range(self, ip_a, ip_b, ports):
@@ -61,7 +59,9 @@ class Scanner(Process):
             else:
                 tasks.append(self.event_loop.create_task(self.check_port(ip_str, ports)))
         results = await asyncio.gather(*tasks)
-        print(results)
+        for result in results:
+            if isinstance(result, tuple):
+                self.stdout(result)
         return results
 
     async def check_many(self, ip_rows, port):
