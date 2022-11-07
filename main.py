@@ -4,7 +4,9 @@ from multiprocessing import Queue, Process
 
 import database
 from scanner import Scanner, PortScanner
+from scanner.port_scanner import scan_ports
 
+PORTS = []
 
 def parse_ports(ports):
     for may_port_range in ports.split(','):
@@ -30,7 +32,7 @@ class Stdout:
 
 
 def temp_callback(ip, port):
-    print(f'********\n{ip}:{port}\n********')
+    print(f'{ip}:{port}')
     with open('out.txt', 'a') as res:
         res.write(f'{ip}:{port}\n')
 
@@ -61,19 +63,15 @@ def main(country: str, ip: str, threads_amount: int, block_size: int,
             thread.start()
             threads.append(thread)
     elif not country and ip:
-        scanners = []
-        for ports in chunks(ports, len(ports) // threads_amount):
-            portscanner = PortScanner(
-                ip=ip,
-                ports=ports,
-                callback=temp_callback,
-                timeout=timeout
-            )
-            portscanner.start()
-            scanners.append(portscanner)
-
-    # for thread in threads:
-    #     thread.join()
+        res = scan_ports(
+            ip, ports, threads_amount, 50, 3
+        )
+        for process_result in res:
+            for chunk_result in process_result:
+                for result in chunk_result:
+                    ip, port, status = result
+                    if status:
+                        print(ip, port)
 
 
 if __name__ == '__main__':
