@@ -36,8 +36,7 @@ def temp_callback(statuses):
     # with open('out.txt', 'a') as res:
     #     res.write(f'{ip}:{port}\n')
     for status in statuses:
-        for chunk in status:
-            print(chunk)
+        print(status)
 
 
 def chunks(lst, n):
