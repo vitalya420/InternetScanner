@@ -50,6 +50,7 @@ class Scanner(Process):
                 self.callback(ip, port)
             return True
         return False
+
     async def check_range(self, ip_a, ip_b, ports):
         tasks = []
         for ip in range(ip_a, ip_b):
@@ -60,6 +61,7 @@ class Scanner(Process):
             else:
                 tasks.append(self.event_loop.create_task(self.check_port(ip_str, ports)))
         results = await asyncio.gather(*tasks)
+        print(results)
         return results
 
     async def check_many(self, ip_rows, port):
