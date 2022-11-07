@@ -56,7 +56,10 @@ class PortChecker:
         for ip_row in ip_rows:
             tasks.append(self.event_loop.create_task(self.check_range_async(ip_row[1], ip_row[2], ports)))
         results = self.event_loop.run_until_complete(asyncio.gather(*tasks))
-        return results
+        ret = []
+        for res in results:
+            ret += res
+        return ret
 
     async def check_many_async(self, ip_rows, port):
         tasks = []

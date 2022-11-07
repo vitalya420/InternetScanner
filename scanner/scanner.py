@@ -58,21 +58,17 @@ class Scanner(Process, PortChecker):
     def proceed_ip_block(self, block):
         ips_amount = self.calc_ips(block)
         if ips_amount <= 25_000:
-            super().check_many(block, self.ports)
+            return super().check_many(block, self.ports)
         else:
             self.stdout(f"Block has to many IPs. Splitting")
             for row in block:
                 ips_in_row = row[2] - row[1]
                 if ips_in_row > 25_000:
                     for i, mini_block in enumerate(self.split_row(row)):
-                        self.stdout(f"Row splitted to mini blocks. Checking block index: {i}. {mini_block}")
-                        start = perf_counter()
-                        super().check_range(*mini_block, self.ports)
-                        self.stdout(f"Mini block check end (index: {i}). "
-                                    f"Total time: {perf_counter() - start}")
+                        return super().check_range(*mini_block, self.ports)
                 else:
                     self.stdout(f"Row has {ips_in_row} IPs. Checking all.")
-                    super().check_range(row[1], row[2], self.ports)
+                    return super().check_range(row[1], row[2], self.ports)
         return True
 
     def run(self) -> None:
@@ -81,7 +77,11 @@ class Scanner(Process, PortChecker):
             self.stdout(f'[{((i + self.block_size) / len(self.ip_rows)) * 100:.2f}]'
                         f'[Starting block check] Amount: {self.calc_ips(ips_block)}')
             start = perf_counter()
-            self.proceed_ip_block(ips_block)
+            res = self.proceed_ip_block(ips_block)
+            for chunk in res:
+                for status in chunk:
+                    if status[2]:
+                        self.callback(*status)
             total_time = perf_counter() - start
             self.stdout(f'[Block check end] Total time: {total_time}')
         self.stdout('Finished!')
