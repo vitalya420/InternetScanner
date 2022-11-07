@@ -32,12 +32,12 @@ class Stdout:
 
 
 def temp_callback(statuses):
-    # print(f'{ip}:{port}')
-    # with open('out.txt', 'a') as res:
-    #     res.write(f'{ip}:{port}\n')
     for status in statuses:
-        print(status)
-
+        ip, port, opened = status
+        if opened:
+            print(f'{ip}:{port}')
+            with open('out.txt', 'a') as res:
+                res.write(f'{ip}:{port}\n')
 
 def chunks(lst, n):
     for i in range(0, len(lst), n):
