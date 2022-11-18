@@ -1,6 +1,7 @@
 out.txt
 IPs.csv
 .idea/
+postgresql/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
