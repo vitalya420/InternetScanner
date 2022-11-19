@@ -1,14 +1,13 @@
 import argparse
-from pprint import pprint
 
 from sqlalchemy import create_engine
 
 import network_scanner
+from network_scanner import utils
 from network_scanner.ip_addr import IPAddr
 from network_scanner.ip_range import IPRange, import_from_csv
-from network_scanner.mass_scanner import MassScanner
-from network_scanner.port_checker import PortCheckerAsyncToSync, PortCheckResult
-from network_scanner.range_scanner import AsyncToSyncRangeScanner
+from network_scanner.scanner import WorkManager
+from network_scanner.port_checker import PortCheckResult
 
 network_scanner.db_manager.setup_database(
     create_engine("postgresql://postgres:postgres@localhost/IPDB")
@@ -34,7 +33,9 @@ def range_lookup(ip_addr):
 
 
 def on_port_opened(res: PortCheckResult):
-    print(res)
+    print(f'{res.ip}:{res.port}')
+    with open('out.txt', 'a') as out:
+        out.write(f'{res.ip}:{res.port}\n')
 
 
 if __name__ == "__main__":
@@ -45,8 +46,9 @@ if __name__ == "__main__":
     parser.add_argument('-p', '--ports', type=str, help="Ports")
     parser.add_argument('--ports-chunk', type=int, help="Port chunk", default=15)
 
-    parser.add_argument('-m', '--mode', type=str, help="Work mode. [lookup, scanner, checker]", default='lookup', required=True)
-    parser.add_argument('-w', '--workers', type=int, help="Pool Workers")
+    parser.add_argument('-m', '--mode', type=str, help="Work mode. [lookup, scanner, checker]", default='lookup',
+                        required=True)
+    parser.add_argument('-w', '--workers', type=int, help="Pool Workers", default=4)
     parser.add_argument('-c', '--country', type=str, help="Country")
     parser.add_argument('--block-size', type=int, help="Block size", default=30)
     parser.add_argument('-T', '--timeout', type=float, help='Timeout', default=1.5)
@@ -55,10 +57,13 @@ if __name__ == "__main__":
     args = parser.parse_args()
     if args.mode == 'scanner':
         country_ips = IPRange.fetch_all_by_country_code(args.country)
-        scanner = MassScanner(country_ips, list(parse_ports(args.ports)), workers=args.workers,
-                              block_size=args.block_size, port_chunk_size=args.ports_chunk,
-                              timeout=args.timeout, callback=on_port_opened)
-        scanner.start()
+        with WorkManager() as manager:
+            for i, ips_chunks in enumerate(utils.chunks(country_ips, len(country_ips) // args.workers)):
+                manager.create_worker(ips_chunks, list(parse_ports(args.ports)),
+                                      ip_chunk_size=args.block_size, port_chunk_size=args.ports_chunk,
+                                      callback=on_port_opened)
+            manager.start()
+
     elif args.mode == 'lookup':
         print(ip_lookup(args.ip).serialize())
     elif args.mode == 'db-init':

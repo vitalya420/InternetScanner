@@ -36,9 +36,27 @@ class IPRange(Base):
         res = db_manager.session.execute(q)
         return res.fetchmany()
 
+    @staticmethod
+    def get_by_country_code(cc):
+        q = select(IPRange).where(IPRange.country_code == cc)
+        res = db_manager.session.execute(q)
+        return res
+
     @property
     def amount(self):
         return self.end - self.start
+
+    def __iter__(self):
+        self.__cur = self.start
+        return self
+
+    def __next__(self):
+        if self.__cur <= self.end:
+            ret = self.__cur
+            self.__cur += 1
+            return ret
+        else:
+            raise StopIteration
 
     def __repr__(self):
         return f"<IPRange(start={self.start}, end={self.end}, " \

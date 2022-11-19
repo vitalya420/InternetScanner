@@ -6,6 +6,8 @@ from dataclasses import dataclass
 
 from network_scanner import utils
 from network_scanner.ip_addr import IPAddr
+from network_scanner.ip_range import IPRange
+from network_scanner.utils import ip2str
 
 
 @dataclass
@@ -20,34 +22,29 @@ class PortCheckResult:
 
 
 class AbstractPortChecker(ABC):
-    def __init__(self, ip, ports: typing.Iterable = tuple()):
-        self.ip = str(ip) if isinstance(ip, IPAddr) else ip
-        self.ports = ports
-
     @abstractmethod
-    def check_port(self, port, ip=None):
+    def check_port(self, ip: typing.Union[str, IPAddr], port: int):
         pass
 
     @abstractmethod
-    def check_ports(self, timeout=3):
+    def check_ports(self, ip: typing.Union[str, int, IPAddr],
+                    ports: typing.Union[typing.Iterable, typing.Sized],
+                    timeout: float = 3, port_chunk_size: typing.Union[int, None] = None):
         pass
 
 
 class PortCheckerAsync(AbstractPortChecker, ABC):
-    def __init__(self, ip, ports: typing.Iterable = tuple(),
-                 event_loop=asyncio.new_event_loop(),
+    def __init__(self, event_loop=asyncio.new_event_loop(),
                  callback: typing.Callable = None):
-        super().__init__(ip, ports)
         self.event_loop = event_loop
         self.callback = callback
 
-    async def check_port(self, port, timeout=3, ip=None):
-        result = PortCheckResult(
-            ip=ip or self.ip,
-            port=port, timeout=timeout, start_time=time.time(),
-            checker_class=self.__class__
-        )
-        future_ = self.event_loop.create_connection(asyncio.Protocol, ip or self.ip, port)
+    async def check_port(self, ip: typing.Union[str, int, IPAddr], port: int, timeout: float = 3):
+        ip = ip2str(ip)
+        result = PortCheckResult(ip=ip, port=port, timeout=timeout,
+                                 start_time=time.time(), checker_class=self.__class__)
+
+        future_ = self.event_loop.create_connection(asyncio.Protocol, ip, port)
         try:
             await asyncio.wait_for(future_, timeout=timeout)
             result.status = True
@@ -58,20 +55,29 @@ class PortCheckerAsync(AbstractPortChecker, ABC):
             self.callback(result)
         return result
 
-    async def check_ports(self, timeout=3, chunk_size=5, ip=None):
+    async def check_ports(self, ip: typing.Union[str, int, IPAddr],
+                          ports: typing.Union[typing.Iterable, typing.Sized],
+                          timeout: float = 3, port_chunk_size: typing.Union[int, None] = None):
+        ip = ip2str(ip)
         ret = []
-        for port_chunk in utils.chunks(self.ports, chunk_size):
-            tasks = []
-            for port in port_chunk:
-                task = self.event_loop.create_task(self.check_port(port, timeout=timeout, ip=ip))
-                tasks.append(task)
+        for port_chunk in utils.chunks(ports, port_chunk_size or len(ports)):
+            tasks = [self.event_loop.create_task(self.check_port(ip, port, timeout)) for port in port_chunk]
             res = await asyncio.gather(*tasks)
             ret.extend(res)
         return ret
 
+    async def check_range(self, ip_range: IPRange, ports: typing.Union[typing.Iterable, typing.Sized],
+                          timeout: float = 3, port_chunk_size: typing.Union[int, None] = None):
+        tasks = [self.event_loop.create_task(self.check_ports(ip, ports, timeout, port_chunk_size))
+                 for ip in ip_range]
+        res = await asyncio.gather(*tasks)
+        return res
 
-class PortCheckerAsyncToSync(PortCheckerAsync):
-    def check_ports(self, timeout=3, chunk_size=5, ip=None):
-        task = self.event_loop.create_task(super().check_ports(timeout, chunk_size))
-        res = self.event_loop.run_until_complete(asyncio.gather(task))
-        return res[0]
+    async def check_many(self, ips: list[IPRange], ports: typing.Union[typing.Iterable, typing.Sized],
+                         timeout: float = 3, ip_chunk_size: typing.Union[int, None] = None,
+                         port_chunk_size: typing.Union[int, None] = None):
+        for ip_chunk in utils.chunks(ips, ip_chunk_size or len(ips)):
+            tasks = [self.event_loop.create_task(self.check_range(ip_range[0], ports, timeout, port_chunk_size))
+                     for ip_range in ip_chunk]
+            res = await asyncio.gather(*tasks)
+            yield [j for i in res for j in i]

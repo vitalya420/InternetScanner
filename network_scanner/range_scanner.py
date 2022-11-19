@@ -18,14 +18,14 @@ class AsyncRangeScanner(PortCheckerAsync):
         self.ip_chunk_size = ip_chunk_size
         self.port_chunk_size = port_chunk_size
 
-    async def check_ports(self, timeout=None, chunk_size=5, ip=None):
+    async def check_ports(self, timeout=None, port_chunk_size=5, ip=None):
         ret = []
         for ip_chunk in utils.chunks(list(range(self.ip_range.start, self.ip_range.end)), self.ip_chunk_size):
             tasks = []
             for ip in ip_chunk:
                 task = self.event_loop.create_task(super().check_ports(
                     ip=socket.inet_ntoa(struct.pack('!L', ip)),
-                    timeout=timeout or self.timeout, chunk_size=self.port_chunk_size or chunk_size
+                    timeout=timeout or self.timeout, port_chunk_size=self.port_chunk_size or port_chunk_size
                 ))
                 tasks.append(task)
             res = await asyncio.gather(*tasks)
@@ -34,9 +34,9 @@ class AsyncRangeScanner(PortCheckerAsync):
 
 
 class AsyncToSyncRangeScanner(AsyncRangeScanner):
-    def check_ports(self, timeout=3, chunk_size=5, ip=None):
+    def check_ports(self, timeout=3, port_chunk_size=5, ip=None):
         task = self.event_loop.create_task(super().check_ports(timeout=timeout,
-                                                               chunk_size=chunk_size,
+                                                               port_chunk_size=port_chunk_size,
                                                                ip=ip))
         res = self.event_loop.run_until_complete(asyncio.gather(task))
         return res[0]
