@@ -17,8 +17,6 @@ network_scanner.db_manager.setup_database(
     create_engine("postgresql://postgres:postgres@localhost/IPDB")
 )
 
-out_filename = 'out.txt'
-
 
 def parse_ports(ports):
     for may_port_range in ports.split(','):
@@ -41,7 +39,7 @@ def range_lookup(ip_addr):
 def on_port_opened(res: PortCheckResult):
     global out_filename
     print(f'{res.ip}:{res.port}')
-    with open(out_filename, 'a') as out:
+    with open('out.txt', 'a') as out:
         out.write(f'{res.ip}:{res.port}\n')
 
 
@@ -119,7 +117,7 @@ def checker(filename):
                                 ],
                                 "author": {
                                     "name": "Minecraft server scanner",
-                                    "url": "https://pornhub.com/",
+                                    "url": "https://mcsrvstat.us/server/{ip}:{port}",
                                     "icon_url": "https://play-lh.googleusercontent.com/VSwHQjcAttxsLE47RuS4PqpC4LT7lCoSjE7Hx5AW_yCxtDvcnsHHvm5CTuL5BPN-uRTP"
                                 }
                             }
