@@ -157,7 +157,7 @@ if __name__ == "__main__":
             for i, ips_chunks in enumerate(utils.chunks(country_ips, len(country_ips) // args.workers)):
                 manager.create_worker(ips_chunks, list(parse_ports(args.ports)),
                                       ip_chunk_size=args.block_size, port_chunk_size=args.ports_chunk,
-                                      callback=on_port_opened)
+                                      callback=on_port_opened, timeout=args.timeout)
             manager.start()
 
     elif args.mode == 'lookup':
