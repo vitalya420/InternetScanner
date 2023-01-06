@@ -117,7 +117,7 @@ def checker(filename):
                                 ],
                                 "author": {
                                     "name": "Minecraft server scanner",
-                                    "url": "https://mcsrvstat.us/server/{ip}:{port}",
+                                    "url": f"https://mcsrvstat.us/server/{ip}:{port}",
                                     "icon_url": "https://play-lh.googleusercontent.com/VSwHQjcAttxsLE47RuS4PqpC4LT7lCoSjE7Hx5AW_yCxtDvcnsHHvm5CTuL5BPN-uRTP"
                                 }
                             }
